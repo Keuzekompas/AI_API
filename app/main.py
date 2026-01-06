@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
 from sentence_transformers import SentenceTransformer, util
@@ -24,6 +25,20 @@ except LookupError:
 load_dotenv()
 
 app = FastAPI()
+
+# --- CORS MIDDLEWARE ---
+# This allows the frontend (running on a different domain) to talk to the API.
+origins = [
+    "*", # Allow all origins for development
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Allow all methods (GET, POST, OPTIONS, etc.)
+    allow_headers=["*"], # Allow all headers
+)
 
 # Global variables
 model = None
