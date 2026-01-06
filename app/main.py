@@ -222,9 +222,9 @@ def predict_study(student: StudentInput):
 
         results.append({
             "ID": str(row['_id']),
-            "Module Naam": row['name_en'],
+            "Module_Name": row['name_en'],
             "Score": round(score, 2),
-            "AI_Reden": ai_reason,
+            "AI_Reason": ai_reason,
             "Details": {
                 "ects": int(row['studycredit']) if pd.notna(row['studycredit']) else 0,
                 "location": loc_str
@@ -232,8 +232,8 @@ def predict_study(student: StudentInput):
         })
 
     return {
-        "aanbevelingen": results,
-        "aantal_resultaten": len(results),
+        "recommendations": results,
+        "number_of_results": len(results),
         "status": "success"
     }
 
