@@ -139,7 +139,7 @@ class StudentInput(BaseModel):
     preferred_location: str | None = None
     current_ects: int
 
-@app.post("/predict")
+@app.post("/api/predict")
 def predict_study(student: StudentInput):
     # 1. Error Handling: Check initialization
     if model is None:
@@ -222,10 +222,10 @@ def predict_study(student: StudentInput):
         "status": "success"
     }
 
-@app.post("/refresh-data")
+@app.post("/api/refresh-data")
 def refresh_data():
     try:
-        load_data_and_model() 
+        load_data_and_model()  
         return {"status": "success", "message": "Database reloaded and embeddings updated."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -249,7 +249,7 @@ def run_training_and_reload():
     except Exception as e:
         print(f"❌ Fout tijdens achtergrond training: {e}")
 
-@app.post("/train")
+@app.post("/api/train")
 def trigger_training(background_tasks: BackgroundTasks):
     """
     Endpoint om training te starten.
