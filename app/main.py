@@ -152,77 +152,171 @@ load_data_and_model()
 class StudentInput(BaseModel):
     description: str         
     preferred_location: str | None = None
-    current_ects: int
+    current_ects: int | None = None
+    tags: list[str] = []
 
 @app.post("/api/predict")
-def predict_study(student: StudentInput):
+def predict_study(student: StudentInput, language: str = "NL"):
     # 1. Error Handling: Check initialization
     if model is None:
         raise HTTPException(status_code=503, detail="AI Model failed to load. Check server logs.")
     if df is None or module_embeddings is None:
         raise HTTPException(status_code=503, detail="Database data not available. Check MongoDB connection.")
 
-    # 2. Embedding (Multilingual handling implicitly done by model or strictly English)
-    # Note: 'all-MiniLM-L6-v2' is English trained. Dutch input might yield lower quality matches 
-    # unless translated. For now, we assume input is compatible or user accepts this limitation.
-    student_embedding = model.encode(student.description, convert_to_tensor=True)
+    # 2. Hard Filter: ECTS
+    # If student has a specific ECTS requirement (15 or 30), we strictly filter the database.
+    filtered_df = df.copy()
+    if student.current_ects:
+        # Ensure studycredit is numeric for comparison, handling potential data issues
+        filtered_df['studycredit_num'] = pd.to_numeric(filtered_df['studycredit'], errors='coerce').fillna(0)
+        filtered_df = filtered_df[filtered_df['studycredit_num'] == student.current_ects]
+        
+        if filtered_df.empty:
+             return {
+                "recommendations": [],
+                "number_of_results": 0,
+                "status": "success",
+                "message": "No modules found with this ECTS."
+            }
 
-    # 3. Semantic Matching
-    cosine_scores = util.cos_sim(student_embedding, module_embeddings)[0]
+    # 3. Embedding
+    # We voegen de tags toe aan de input text voor een betere match
+    tags_text = ", ".join(student.tags) if student.tags else ""
+    input_text = f"Tags: {tags_text}. Description: {student.description}"
+    
+    student_embedding = model.encode(input_text, convert_to_tensor=True)
+
+    # 4. Semantic Matching
+    # We moeten nu de embeddings ophalen die horen bij de gefilterde rows.
+    # Omdat module_embeddings overeenkomt met de originele df index, is het makkelijker 
+    # om de gefilterde subset opnieuw te encoderen OF de indices te mappen.
+    # Gezien de dataset klein is (<1000?), is filteren en slicen van embeddings prima, 
+    # maar embeddings zijn tensor objects.
+    
+    # Slimme aanpak: We gebruiken de indices van de filtered_df om de juiste embeddings te pakken.
+    # df.index is de originele index.
+    filtered_indices = filtered_df.index.tolist()
+    
+    # Selecteer de juiste embeddings uit de grote tensor
+    relevant_embeddings = module_embeddings[filtered_indices]
+    
+    cosine_scores = util.cos_sim(student_embedding, relevant_embeddings)[0]
     scores = cosine_scores.cpu().numpy()
 
-    # 4. Business Logic: Location Bonus
-    if student.preferred_location:
+    # 5. Business Logic: Location Bonus
+    if student.preferred_location and student.preferred_location != "Geen":
         # Case insensitive match
-        loc_matches = df['location'].str.contains(student.preferred_location, case=False, na=False)
+        loc_matches = filtered_df['location'].str.contains(student.preferred_location, case=False, na=False)
         scores[loc_matches] += 0.15
 
-    # 5. Business Logic: ECTS Penalty
-    if student.current_ects:
-        # Convert to numeric, coerce errors to NaN then 0
-        study_credits = pd.to_numeric(df['studycredit'], errors='coerce').fillna(0)
-        ects_diff = abs(study_credits - student.current_ects)
-        scores -= (ects_diff.to_numpy() * 0.01)
+    # 5b. Business Logic: Explicit Tag Boost
+    # Check if user tags appear in the module's tags (NL or EN).
+    if student.tags:
+        # Normalize user tags for comparison (lowercase)
+        user_tags = [t.lower() for t in student.tags]
+        
+        # Function to check overlap
+        def calculate_tag_boost(row):
+            boost = 0.0
+            # Combine all tags from row
+            row_tags = []
+            
+            # Helper to safely extract list or string
+            def extract(val):
+                if isinstance(val, list): return val
+                if isinstance(val, str):
+                    try:
+                        import ast
+                        res = ast.literal_eval(val)
+                        if isinstance(res, list): return res
+                        return [val]
+                    except:
+                        if "," in val: return [x.strip() for x in val.split(",")]
+                        return [val]
+                return []
+
+            row_tags.extend(extract(row.get('module_tags_en', [])))
+            row_tags.extend(extract(row.get('module_tags_nl', [])))
+            
+            # Normalize row tags
+            row_tags_lower = [str(t).lower() for t in row_tags]
+            
+            # Check for matches
+            for ut in user_tags:
+                if any(ut in rt for rt in row_tags_lower): # Partial match allowed (e.g. 'sport' in 'top sport')
+                    boost += 0.05 # 5% boost per matching tag category
+            
+            return min(boost, 0.20) # Max 20% boost from tags
+
+        # Apply boost
+        tag_boosts = filtered_df.apply(calculate_tag_boost, axis=1).to_numpy()
+        scores += tag_boosts
 
     # 6. Retrieve Top Results
-    top_k = 5
-    # Get indices of top k scores
-    top_indices = scores.argsort()[-top_k:][::-1]
+    top_k = min(5, len(filtered_df))
+    top_indices_local = scores.argsort()[-top_k:][::-1] # Dit zijn indices in de filtered lijst (0 tot len(filtered))
 
     results = []
     
-    for idx in top_indices:
-        idx = int(idx) # ensure python int
-        row = df.iloc[idx]
-        score = float(scores[idx])
+    # Bepaal welke kolommen we teruggeven op basis van taal
+    lang_suffix = "_en" if language.upper() == "EN" else "_nl"
+    
+    for local_idx in top_indices_local:
+        local_idx = int(local_idx)
+        # Haal de echte row op
+        row = filtered_df.iloc[local_idx]
+        score = float(scores[local_idx])
         
         # --- Explainable AI Logic (The 'Why') ---
-        # We split the module text into sentences and find the best matching sentence
-        full_text = f"{row['shortdescription_en']} {row['description_en']}"
-        sentences = nltk.sent_tokenize(full_text)
+        # Haal de beschrijving op in de juiste taal voor de uitleg
+        desc_col = f'description{lang_suffix}'
+        short_desc_col = f'shortdescription{lang_suffix}'
+        
+        # Fallback naar Engels als NL leeg is (of andersom)
+        description_text = row.get(desc_col, "")
+        if not description_text:
+             description_text = row.get('description_en', "")
+        
+        short_description_text = row.get(short_desc_col, "")
+        if not short_description_text:
+             short_description_text = row.get('shortdescription_en', "")
+
+        full_text_for_reason = f"{short_description_text} {description_text}"
+        sentences = nltk.sent_tokenize(full_text_for_reason)
         
         ai_reason = "Match based on general profile overlap."
+        if language.upper() == "NL":
+             ai_reason = "Match op basis van je profiel."
+
         if sentences:
-            # Encode sentences to find the specific trigger
             sent_embeddings = model.encode(sentences, convert_to_tensor=True)
             sent_scores = util.cos_sim(student_embedding, sent_embeddings)[0]
             best_sent_idx = sent_scores.argmax().item()
             best_sentence = sentences[best_sent_idx].strip()
-            # Truncate if too long
+            
             if len(best_sentence) > 200:
                 best_sentence = best_sentence[:197] + "..."
-            ai_reason = f'💡 AI-Inzicht: "...{best_sentence}..."'
+            
+            if language.upper() == "NL":
+                ai_reason = f'💡 AI-Inzicht: "...{best_sentence}..."'
+            else:
+                ai_reason = f'💡 AI-Insight: "...{best_sentence}..."'
 
-        # Location Check formatted string
+        # Location Check
         loc_str = str(row['location'])
         if student.preferred_location and student.preferred_location.lower() in loc_str.lower():
-            loc_check = "✅ Locatie match"
+            loc_check = "✅ Locatie match" if language.upper() == "NL" else "✅ Location match"
         else:
             loc_check = f"📍 in {loc_str}"
 
+        # Naam ophalen
+        name_col = f'name{lang_suffix}'
+        module_name = row.get(name_col, row['name_en']) # fallback naar EN
+
         results.append({
             "ID": str(row['_id']),
-            "Module_Name": row['name_en'],
+            "Module_Name": module_name,
+            "Description": short_description_text if short_description_text else description_text[:100] + "...",
             "Score": round(score, 2),
             "AI_Reason": ai_reason,
             "Details": {
