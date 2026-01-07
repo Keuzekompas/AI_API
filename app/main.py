@@ -57,6 +57,7 @@ def refresh_data(token: dict = Depends(verify_token)):
         load_data_and_model()  
         return {"status": "success", "message": "Database reloaded and embeddings updated."}
     except Exception as e:
+        # Note: Exception in Python 3 does not catch SystemExit, KeyboardInterrupt, GeneratorExit
         raise HTTPException(status_code=500, detail=str(e))
     
 def run_training_and_reload():
