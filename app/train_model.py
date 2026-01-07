@@ -60,34 +60,39 @@ def _preprocess_data(data):
     df['clean_tags_nl'] = df['module_tags_nl'].apply(clean_tags)
     return df
 
+def _process_row(row):
+    examples = []
+    # --- ENGELS ---
+    tags_en = str(row['clean_tags_en'])
+    desc_en = (str(row['shortdescription_en']) + " " + str(row['description_en'])).strip()
+    title_en = str(row['name_en']).strip()
+
+    if len(tags_en) > 2 and len(desc_en) > 10:
+        examples.append(InputExample(texts=[tags_en, desc_en]))
+    if len(title_en) > 2 and len(desc_en) > 10:
+        examples.append(InputExample(texts=[title_en, desc_en]))
+
+    # --- NEDERLANDS ---
+    tags_nl = str(row['clean_tags_nl'])
+    if len(tags_nl) < 2: 
+        tags_nl = tags_en
+        
+    desc_nl = (str(row['shortdescription_nl']) + " " + str(row['description_nl'])).strip()
+    title_nl = str(row['name_nl']).strip()
+    
+    if len(desc_nl) > 10:
+        if len(tags_nl) > 2:
+                examples.append(InputExample(texts=[tags_nl, desc_nl]))
+        if len(title_nl) > 2:
+                examples.append(InputExample(texts=[title_nl, desc_nl]))
+    return examples
+
 def _create_training_examples(df):
     train_examples = []
     print("🏋️  Trainingsdata voorbereiden (alleen EN en NL)...")
     
     for _, row in df.iterrows():
-        # --- ENGELS ---
-        tags_en = str(row['clean_tags_en'])
-        desc_en = (str(row['shortdescription_en']) + " " + str(row['description_en'])).strip()
-        title_en = str(row['name_en']).strip()
-
-        if len(tags_en) > 2 and len(desc_en) > 10:
-            train_examples.append(InputExample(texts=[tags_en, desc_en]))
-        if len(title_en) > 2 and len(desc_en) > 10:
-            train_examples.append(InputExample(texts=[title_en, desc_en]))
-
-        # --- NEDERLANDS ---
-        tags_nl = str(row['clean_tags_nl'])
-        if len(tags_nl) < 2: 
-            tags_nl = tags_en
-            
-        desc_nl = (str(row['shortdescription_nl']) + " " + str(row['description_nl'])).strip()
-        title_nl = str(row['name_nl']).strip()
-        
-        if len(desc_nl) > 10:
-            if len(tags_nl) > 2:
-                 train_examples.append(InputExample(texts=[tags_nl, desc_nl]))
-            if len(title_nl) > 2:
-                 train_examples.append(InputExample(texts=[title_nl, desc_nl]))
+        train_examples.extend(_process_row(row))
     
     return train_examples
 

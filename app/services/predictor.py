@@ -28,28 +28,30 @@ def _apply_location_boost(scores, filtered_df, preferred_location):
         scores[loc_matches] += settings.LOCATION_BOOST
     return scores
 
+def _extract_tag_list(val):
+    if isinstance(val, list): return val
+    if isinstance(val, str):
+        try:
+            import ast
+            res = ast.literal_eval(val)
+            if isinstance(res, list): return res
+            return [val]
+        except (ValueError, SyntaxError):
+            if "," in val: return [x.strip() for x in val.split(",")]
+            return [val]
+        except Exception:
+            return [val]
+    return []
+
+def _get_row_tags(row):
+    row_tags = []
+    row_tags.extend(_extract_tag_list(row.get('module_tags_en', [])))
+    row_tags.extend(_extract_tag_list(row.get('module_tags_nl', [])))
+    return row_tags
+
 def _calculate_single_tag_boost(row, user_tags):
     boost = 0.0
-    row_tags = []
-    
-    def extract(val):
-        if isinstance(val, list): return val
-        if isinstance(val, str):
-            try:
-                import ast
-                res = ast.literal_eval(val)
-                if isinstance(res, list): return res
-                return [val]
-            except (ValueError, SyntaxError):
-                if "," in val: return [x.strip() for x in val.split(",")]
-                return [val]
-            except Exception:
-                return [val]
-        return []
-
-    row_tags.extend(extract(row.get('module_tags_en', [])))
-    row_tags.extend(extract(row.get('module_tags_nl', [])))
-    
+    row_tags = _get_row_tags(row)
     row_tags_lower = [str(t).lower() for t in row_tags]
     
     for ut in user_tags:
