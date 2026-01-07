@@ -42,6 +42,7 @@ psutil==7.2.1
 pyarrow==22.0.0
 pydantic==2.12.5
 pydantic_core==2.41.5
+PyJWT==2.10.1
 pymongo==4.15.5
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1

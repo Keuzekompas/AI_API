@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import nltk
 from .schemas import StudentInput
 from .services.state import state
 from .services.loader import load_data_and_model
 from .services.predictor import predict_recommendations
+from .services.auth import verify_token
 from .train_model import train_and_save_model
 import os
 from dotenv import load_dotenv
@@ -40,7 +41,7 @@ def startup_event():
 # --- ENDPOINTS ---
 
 @app.post("/api/predict")
-def predict_study(student: StudentInput, language: str = "NL"):
+def predict_study(student: StudentInput, language: str = "NL", token: dict = Depends(verify_token)):
     if not state.is_ready():
         raise HTTPException(status_code=503, detail="AI Model or Database not ready.")
     
@@ -51,7 +52,7 @@ def predict_study(student: StudentInput, language: str = "NL"):
     return predict_recommendations(student, language)
 
 @app.post("/api/refresh-data")
-def refresh_data():
+def refresh_data(token: dict = Depends(verify_token)):
     try:
         load_data_and_model()  
         return {"status": "success", "message": "Database reloaded and embeddings updated."}
@@ -69,7 +70,7 @@ def run_training_and_reload():
         print(f"❌ Error during background training: {e}")
 
 @app.post("/api/train")
-def trigger_training(background_tasks: BackgroundTasks):
+def trigger_training(background_tasks: BackgroundTasks, token: dict = Depends(verify_token)):
     background_tasks.add_task(run_training_and_reload)
     return {
         "status": "accepted", 
