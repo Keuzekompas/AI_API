@@ -1,8 +1,9 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import nltk
-from .schemas import StudentInput
 import os
 from dotenv import load_dotenv
 
@@ -24,7 +25,12 @@ except LookupError:
     nltk.download('punkt')
     nltk.download('punkt_tab')
 
+# Rate-Limiting Setup
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler) # Rate limit handler
 
 # --- CORS MIDDLEWARE ---
 origins = [os.getenv("CORS_POLICY")]
@@ -56,24 +62,20 @@ def predict_study(
         raise HTTPException(status_code=503, detail="AI Model or Database not ready.")
     
     student.sanitize()
-    
-    # 1. Haal de ruwe data op uit de service
+
     raw_data = predict_recommendations(student, language)
-    
-    # 2. Pak de ECHTE lijst met modules eruit.
-    # Volgens jouw JSON structuur zit de lijst in raw_data['recommendations']
     modules_list = raw_data.get('recommendations', [])
     
-    # 3. Sanitize alleen de lijst met modules
+    # Sanitize all strings in the recommendations recursively
     clean_modules = sanitize_recursive(modules_list)
-    
-    # 4. Return exact wat je RecommendationResponse schema verwacht
     return {
         "recommendations": clean_modules, 
         "language": language
     }
 
 @app.post("/api/refresh-data")
+@limiter.limit("5/minute")
+def refresh_data(request: Request, token: dict = Depends(verify_token)):
     try:
         load_data_and_model()  
         return {"status": "success", "message": "Database reloaded and embeddings updated."}
@@ -92,7 +94,12 @@ def run_training_and_reload():
         print(f"Error during background training: {e}")
 
 @app.post("/api/train")
-def trigger_training(background_tasks: BackgroundTasks, token: dict = Depends(verify_token)):
+@limiter.limit("2/minute")
+def trigger_training(
+    request: Request, 
+    background_tasks: BackgroundTasks, 
+    token: dict = Depends(verify_token)
+):
     background_tasks.add_task(run_training_and_reload)
     return {
         "status": "accepted", 
