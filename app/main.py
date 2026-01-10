@@ -40,12 +40,17 @@ def startup_event():
 
 # --- ENDPOINTS ---
 
-@app.post("/api/predict")
-def predict_study(student: StudentInput, language: str = "NL", token: dict = Depends(verify_token)):
+@app.post("/api/predict", response_model=RecommendationResponse)
+@limiter.limit("4/minute") 
+def predict_study(
+    request: Request, 
+    student: StudentInput, 
+    language: str = "NL", 
+    token: dict = Depends(verify_token)
+):
     if not state.is_ready():
         raise HTTPException(status_code=503, detail="AI Model or Database not ready.")
     
-    # Sanitize input
     student.sanitize()
     
     # Predict
@@ -61,14 +66,14 @@ def refresh_data(token: dict = Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
     
 def run_training_and_reload():
-    print("⏳ Background task: Training model...")
+    print("Background task: Training model...")
     try:
         train_and_save_model() 
-        print("🔄 Training done. Reloading data...")
+        print("Training done. Reloading data...")
         load_data_and_model()
-        print("✅ System updated!")
+        print("System updated!")
     except Exception as e:
-        print(f"❌ Error during background training: {e}")
+        print(f"Error during background training: {e}")
 
 @app.post("/api/train")
 def trigger_training(background_tasks: BackgroundTasks, token: dict = Depends(verify_token)):

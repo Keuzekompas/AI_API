@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import List
 from .utils import sanitize_text
 
 class StudentInput(BaseModel):
@@ -12,3 +13,19 @@ class StudentInput(BaseModel):
         self.tags = [sanitize_text(t) for t in self.tags]
         if self.preferred_location:
             self.preferred_location = sanitize_text(self.preferred_location)
+
+class ModuleDetails(BaseModel):
+    ects: int
+    location: str
+
+class RecommendationEntry(BaseModel):
+    ID: str
+    Module_Name: str
+    Description: str
+    Score: float
+    AI_Reason: str
+    Details: ModuleDetails
+
+class RecommendationResponse(BaseModel):
+    recommendations: List[RecommendationEntry]
+    language: str
