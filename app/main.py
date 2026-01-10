@@ -1,14 +1,18 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 import nltk
 from .schemas import StudentInput
+import os
+from dotenv import load_dotenv
+
+from .schemas import RecommendationResponse, StudentInput
 from .services.state import state
 from .services.loader import load_data_and_model
 from .services.predictor import predict_recommendations
 from .services.auth import verify_token
 from .train_model import train_and_save_model
-import os
-from dotenv import load_dotenv
+from .utils import sanitize_recursive
 
 load_dotenv()
 
@@ -53,11 +57,23 @@ def predict_study(
     
     student.sanitize()
     
-    # Predict
-    return predict_recommendations(student, language)
+    # 1. Haal de ruwe data op uit de service
+    raw_data = predict_recommendations(student, language)
+    
+    # 2. Pak de ECHTE lijst met modules eruit.
+    # Volgens jouw JSON structuur zit de lijst in raw_data['recommendations']
+    modules_list = raw_data.get('recommendations', [])
+    
+    # 3. Sanitize alleen de lijst met modules
+    clean_modules = sanitize_recursive(modules_list)
+    
+    # 4. Return exact wat je RecommendationResponse schema verwacht
+    return {
+        "recommendations": clean_modules, 
+        "language": language
+    }
 
 @app.post("/api/refresh-data")
-def refresh_data(token: dict = Depends(verify_token)):
     try:
         load_data_and_model()  
         return {"status": "success", "message": "Database reloaded and embeddings updated."}
