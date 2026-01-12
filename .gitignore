@@ -179,3 +179,20 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Python rommel (niet nodig)
+__pycache__/
+*.py[cod]
+
+# Virtual Environment (nooit uploaden, iedereen maakt zijn eigen venv)
+venv/
+.venv/
+
+# Environment Variables (GEHEIM! Hier staan je wachtwoorden in)
+.env
+
+# Machine Learning Model (Te groot, we genereren dit zelf wel)
+app/model/model.joblib
+
+# VS Code settings (optioneel, vaak handig om niet te delen)
+.vscode/
