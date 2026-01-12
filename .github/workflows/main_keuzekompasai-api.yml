@@ -1,4 +1,4 @@
-name: Build and Deploy Docker Image to Azure
+name: Build and Deploy Docker Image
 
 on:
   push:
@@ -7,14 +7,11 @@ on:
   workflow_dispatch:
 
 env:
-  # VUL HIER JE EIGEN GEGEVENS IN
-  ACR_NAME: "keuzekompasacr"   # De naam die je bij Stap 1 koos (zonder .azurecr.io)
-  IMAGE_NAME: "ai-api"         # Naam voor je image
-  REPO_NAME: "Keuzekompas/AI_API"
+  ACR_NAME: "keuzekompasacr"   # Naam van je registry
+  IMAGE_NAME: "ai-api"         # Naam van je image
 
 permissions:
   contents: read
-  id-token: write # Nodig om in te loggen bij Azure
 
 jobs:
   build-and-deploy:
@@ -22,35 +19,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Inloggen bij Azure
-      - name: Login to Azure
-        uses: azure/login@v2
+      # 1. Inloggen bij Docker (met gebruikersnaam/wachtwoord ipv Service Principal)
+      - name: Log in to Azure Container Registry
+        uses: docker/login-action@v3
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_C8B7723884AF44D192E46FDA5E81370A }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_FFF98616522B4CA3BB1F82D24910FA2A }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_D4E406038F0446FA827C0133BC3FC8B5 }}
+          registry: ${{ env.ACR_NAME }}.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
-      # 2. Inloggen bij je Container Registry
-      - name: Login to ACR
-        run: az acr login --name ${{ env.ACR_NAME }}
-
-      # 3. Bouwen en Pushen van de Docker Image
-      - name: Build and Push Image
+      # 2. Bouwen en Pushen
+      - name: Build and Push Docker Image
         run: |
-          # Bouw de image
           docker build -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} .
-          # Tag hem ook als 'latest'
           docker tag ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
           
-          # Push naar Azure
           docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
           docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
 
-      # 4. Deploy naar Web App
+      # 3. Deployen naar Web App (met Publicatieprofiel)
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'KeuzeKompasAI-API'
+          app-name: 'KeuzeKompasAI-API' # Pas aan als je nieuwe app anders heet!
           slot-name: 'Production'
-          # Hier zeggen we: gebruik deze container image
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           images: '${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest'
