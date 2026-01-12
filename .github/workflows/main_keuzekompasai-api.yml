@@ -1,4 +1,4 @@
-name: Build and deploy Python app to Azure Web App - KeuzeKompasAI-API
+name: Build and Deploy Docker Image to Azure
 
 on:
   push:
@@ -6,65 +6,51 @@ on:
       - main
   workflow_dispatch:
 
-# Algemene permissies (lezen is genoeg voor build)
+env:
+  # VUL HIER JE EIGEN GEGEVENS IN
+  ACR_NAME: "keuzekompasacr"   # De naam die je bij Stap 1 koos (zonder .azurecr.io)
+  IMAGE_NAME: "ai-api"         # Naam voor je image
+  REPO_NAME: "Keuzekompas/AI_API"
+
 permissions:
   contents: read
+  id-token: write # Nodig om in te loggen bij Azure
 
 jobs:
-  # ======================================================
-  # JOB 1: BUILD (Dependencies installeren + Zippen)
-  # ======================================================
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python version
-        uses: actions/setup-python@v5
+      # 1. Inloggen bij Azure
+      - name: Login to Azure
+        uses: azure/login@v2
         with:
-          python-version: '3.13' 
-          cache: 'pip'
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_C8B7723884AF44D192E46FDA5E81370A }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_FFF98616522B4CA3BB1F82D24910FA2A }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_D4E406038F0446FA827C0133BC3FC8B5 }}
 
-      - name: Install dependencies (CPU Optimized)
+      # 2. Inloggen bij je Container Registry
+      - name: Login to ACR
+        run: az acr login --name ${{ env.ACR_NAME }}
+
+      # 3. Bouwen en Pushen van de Docker Image
+      - name: Build and Push Image
         run: |
-          python -m pip install --upgrade pip
+          # Bouw de image
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+          # Tag hem ook als 'latest'
+          docker tag ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
           
-          # Maak de map voor lokale packages
-          mkdir .python_packages
-          
-          # 1. Installeer CPU versie van Torch
-          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --target=".python_packages"
-          
-          # 2. Installeer de rest (behalve torch)
-          grep -v "torch" requirements.txt > requirements_no_torch.txt
-          pip install -r requirements_no_torch.txt --target=".python_packages"
+          # Push naar Azure
+          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
 
-      - name: Archive application
-        run: |
-          # Zip alles naar release.zip
-          zip -r release.zip . -x ".git/*" ".github/*" "__pycache__/*" "antenv/*"
-        shell: bash
-
-      - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v4
+      # 4. Deploy naar Web App
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
         with:
-          name: python-app
-          path: release.zip
-          retention-days: 1
-
-  # ======================================================
-  # JOB 2: DEPLOY (Zip downloaden + Naar Azure sturen)
-  # ======================================================
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build # Wacht tot build klaar is
-    permissions:
-      id-token: write # Specifiek nodig voor Azure Login
-      contents: read
-
-    steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v4
-        with:
-          name: python-app
+          app-name: 'KeuzeKompasAI-API'
+          slot-name: 'Production'
+          # Hier zeggen we: gebruik deze container image
+          images: '${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest'
