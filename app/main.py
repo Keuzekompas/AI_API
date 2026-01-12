@@ -1,14 +1,19 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import nltk
-from .schemas import StudentInput
+import os
+from dotenv import load_dotenv
+
+from .schemas import RecommendationResponse, StudentInput
 from .services.state import state
 from .services.loader import load_data_and_model
 from .services.predictor import predict_recommendations
 from .services.auth import verify_token
 from .train_model import train_and_save_model
-import os
-from dotenv import load_dotenv
+from .utils import sanitize_recursive
 
 load_dotenv()
 
@@ -20,7 +25,12 @@ except LookupError:
     nltk.download('punkt')
     nltk.download('punkt_tab')
 
+# Rate-Limiting Setup
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler) # Rate limit handler
 
 # --- CORS MIDDLEWARE ---
 origins = [os.getenv("CORS_POLICY")]
@@ -40,19 +50,32 @@ def startup_event():
 
 # --- ENDPOINTS ---
 
-@app.post("/api/predict")
-def predict_study(student: StudentInput, language: str = "NL", token: dict = Depends(verify_token)):
+@app.post("/api/predict", response_model=RecommendationResponse)
+@limiter.limit("4/minute") 
+def predict_study(
+    request: Request, 
+    student: StudentInput, 
+    language: str = "NL", 
+    token: dict = Depends(verify_token)
+):
     if not state.is_ready():
         raise HTTPException(status_code=503, detail="AI Model or Database not ready.")
     
-    # Sanitize input
     student.sanitize()
+
+    raw_data = predict_recommendations(student, language)
+    modules_list = raw_data.get('recommendations', [])
     
-    # Predict
-    return predict_recommendations(student, language)
+    # Sanitize all strings in the recommendations recursively
+    clean_modules = sanitize_recursive(modules_list)
+    return {
+        "recommendations": clean_modules, 
+        "language": language
+    }
 
 @app.post("/api/refresh-data")
-def refresh_data(token: dict = Depends(verify_token)):
+@limiter.limit("5/minute")
+def refresh_data(request: Request, token: dict = Depends(verify_token)):
     try:
         load_data_and_model()  
         return {"status": "success", "message": "Database reloaded and embeddings updated."}
@@ -61,17 +84,22 @@ def refresh_data(token: dict = Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
     
 def run_training_and_reload():
-    print("⏳ Background task: Training model...")
+    print("Background task: Training model...")
     try:
         train_and_save_model() 
-        print("🔄 Training done. Reloading data...")
+        print("Training done. Reloading data...")
         load_data_and_model()
-        print("✅ System updated!")
+        print("System updated!")
     except Exception as e:
-        print(f"❌ Error during background training: {e}")
+        print(f"Error during background training: {e}")
 
 @app.post("/api/train")
-def trigger_training(background_tasks: BackgroundTasks, token: dict = Depends(verify_token)):
+@limiter.limit("2/minute")
+def trigger_training(
+    request: Request, 
+    background_tasks: BackgroundTasks, 
+    token: dict = Depends(verify_token)
+):
     background_tasks.add_task(run_training_and_reload)
     return {
         "status": "accepted", 

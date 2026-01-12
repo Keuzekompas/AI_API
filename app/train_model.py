@@ -7,33 +7,33 @@ from dotenv import load_dotenv
 import os
 import joblib
 
-# Laad settings
+# Load settings
 load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 DB_NAME = os.getenv("DB_NAME", "KeuzeKompas")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "modules")
 
 def _fetch_data_from_db():
-    print("🔌 Verbinden met MongoDB...")
+    print("Connecting to MongoDB...")
     try:
         client = MongoClient(MONGO_URI)
         db = client[DB_NAME]
         collection = db[COLLECTION_NAME]
         data = list(collection.find())
         if not data:
-            print("❌ Geen data gevonden in MongoDB.")
+            print("No data found in MongoDB.")
             return None
         return data
     except PyMongoError as e:
-        print(f"❌ Database error: {e}")
+        print(f"Database error: {e}")
         return None
     except Exception as e:
-        print(f"❌ Unexpected error during data retrieval: {e}")
+        print(f"Unexpected error during data retrieval: {e}")
         return None
 
 def _preprocess_data(data):
     df = pd.DataFrame(data)
-    print(f"✅ {len(df)} modules geladen uit database.")
+    print(f"✅ {len(df)} modules loaded from database.")
 
     required_cols = [
         'module_tags_en', 'module_tags_nl', 
@@ -89,7 +89,7 @@ def _process_row(row):
 
 def _create_training_examples(df):
     train_examples = []
-    print("🏋️  Trainingsdata voorbereiden (alleen EN en NL)...")
+    print(" Preparing training data (only EN and NL)...")
     
     for _, row in df.iterrows():
         train_examples.extend(_process_row(row))
@@ -100,7 +100,7 @@ def _train_model(model, train_examples):
     train_dataloader = DataLoader(train_examples, shuffle=True, batch_size=16, num_workers=0)
     train_loss = losses.MultipleNegativesRankingLoss(model)
 
-    print(f"🚀 Start Fine-Tuning op {len(train_examples)} paren (CPU mode)...")
+    print(f"Start Fine-Tuning on {len(train_examples)} pairs (CPU mode)...")
     model.fit(
         train_objectives=[(train_dataloader, train_loss)],
         epochs=3,
@@ -113,9 +113,9 @@ def _save_model(model):
     output_path = os.path.join(os.path.dirname(__file__), 'model', 'model.joblib')
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    print(f"💾 Model opslaan naar {output_path}...")
+    print(f"Saving model to {output_path}...")
     joblib.dump(model, output_path)
-    print("✅ Training klaar! Herstart de API of wacht op auto-reload.")
+    print("Training complete! Restart the API or wait for auto-reload.")
 
 def train_and_save_model():
     data = _fetch_data_from_db()
@@ -125,12 +125,12 @@ def train_and_save_model():
     df = _preprocess_data(data)
     
     model_name = 'paraphrase-multilingual-MiniLM-L12-v2' 
-    print(f"🧠 Basismodel laden: {model_name}...")
+    print(f"Loading base model: {model_name}...")
     model = SentenceTransformer(model_name)
 
     train_examples = _create_training_examples(df)
     if not train_examples:
-        print("❌ Te weinig data om te trainen.")
+        print("Not enough data to train.")
         return
 
     print(f"Generated {len(train_examples)} training pairs.")
