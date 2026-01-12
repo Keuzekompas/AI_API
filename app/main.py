@@ -23,7 +23,8 @@ except LookupError:
 app = FastAPI()
 
 # --- CORS MIDDLEWARE ---
-origins = [os.getenv("CORS_POLICY")]
+cors_env = os.getenv("CORS_POLICY", "")
+origins = cors_env.split(",") if cors_env else []
 
 app.add_middleware(
     CORSMiddleware,
