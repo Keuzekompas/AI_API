@@ -35,8 +35,8 @@ def setup_mock_state():
         "shortdescription_nl": "Korte test",
         "module_tags_en": ["test", "ai"],
         "module_tags_nl": ["test", "ai"],
-        "studycredit": 30,  # Increased to ensure it passes ECTS filters
-        "location": "Rotterdam",
+        "studycredit": 15,
+        "location": "Breda",
         "ai_context": "Test context"
     }])
 
@@ -51,10 +51,10 @@ def test_predict_study_success():
     app.dependency_overrides[verify_token] = lambda: {"sub": "test_user"}
 
     test_payload = {
-        "description": "I want to learn about artificial intelligence",
-        "preferred_location": "Rotterdam",
+        "description": "I want to learn about AI and data science.",
+        "preferred_location": "Breda",
         "current_ects": 15,
-        "tags": ["testing"]
+        "tags": ["ai"]
     }
 
     response = client.post("/api/predict?language=NL", json=test_payload)
