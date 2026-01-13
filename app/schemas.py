@@ -1,7 +1,12 @@
 from pydantic import BaseModel, Field
 from typing import List
+from enum import Enum
 from .utils import sanitize_text
 
+class LanguageEnum(str, Enum):
+    NL = "NL"
+    EN = "EN"
+    
 class StudentInput(BaseModel):
     description: str = Field(..., max_length=1000)
     preferred_location: str | None = None
@@ -28,4 +33,4 @@ class RecommendationEntry(BaseModel):
 
 class RecommendationResponse(BaseModel):
     recommendations: List[RecommendationEntry]
-    language: str
+    language: LanguageEnum

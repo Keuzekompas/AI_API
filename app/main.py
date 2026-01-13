@@ -7,7 +7,7 @@ import nltk
 import os
 from dotenv import load_dotenv
 
-from .schemas import RecommendationResponse, StudentInput
+from .schemas import RecommendationResponse, StudentInput, LanguageEnum
 from .services.state import state
 from .services.loader import load_data_and_model
 from .services.predictor import predict_recommendations
@@ -56,7 +56,7 @@ def startup_event():
 def predict_study(
     request: Request, 
     student: StudentInput, 
-    language: str = "NL", 
+    language: LanguageEnum = LanguageEnum.NL, # Default language
     token: dict = Depends(verify_token)
 ):
     if not state.is_ready():
@@ -64,14 +64,14 @@ def predict_study(
     
     student.sanitize()
 
-    raw_data = predict_recommendations(student, language)
+    raw_data = predict_recommendations(student, language.value)
     modules_list = raw_data.get('recommendations', [])
     
     # Sanitize all strings in the recommendations recursively
     clean_modules = sanitize_recursive(modules_list)
     return {
         "recommendations": clean_modules, 
-        "language": language
+        "language": language.value
     }
 
 @app.post("/api/refresh-data")
