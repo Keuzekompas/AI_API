@@ -21,6 +21,9 @@ RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://
 RUN grep -v "torch" requirements.txt > requirements_no_torch.txt
 RUN pip install --no-cache-dir -r requirements_no_torch.txt
 
+# Download NLTK data tijdens de build, zodat het niet tijdens startup hoeft
+RUN python -m nltk.downloader punkt punkt_tab
+
 # 7. Kopieer de rest van je code
 COPY . .
 
