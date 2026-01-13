@@ -71,3 +71,5 @@ urllib3==2.6.3
 uvicorn==0.40.0
 xxhash==3.6.0
 yarl==1.22.0
+mongomock==4.1.2
+pytest==8.0.0
