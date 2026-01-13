@@ -35,9 +35,9 @@ RUN mkdir -p app/model
 # Let op de output vlag -O: die zorgt dat hij in de juiste map komt.
 RUN wget https://huggingface.co/Q0xuzBEFIs/keuzekompas-model/resolve/main/model.joblib -O app/model/model.joblib
 
-# 9. Open poort 8000
-EXPOSE 8000
+# 9. Open poort 80
+EXPOSE 80
 
 # 10. Start de app
 ENV PYTHONPATH=/app
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--timeout", "600", "-k", "uvicorn.workers.UvicornWorker", "app.main:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:80", "--timeout", "600", "-k", "uvicorn.workers.UvicornWorker", "app.main:app"]
