@@ -1,4 +1,4 @@
-name: Deploy Backend API
+name: Deploy AI Service
 
 on:
   push:
@@ -12,8 +12,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # STAP 1: Maak .env bestand
-      # We combineren hier Secrets (veilig) met hardcoded settings (handig)
+      # STAP 1: Maak .env bestand (Jouw toegevoegde stukje)
       - name: Create .env file
         run: |
           # --- GEHEIMEN UIT GITHUB ---
@@ -25,31 +24,27 @@ jobs:
           echo "DB_NAME=KeuzeKompas" >> .env
           echo "COLLECTION_NAME=modules" >> .env
           echo "JWT_ALGORITHM=HS256" >> .env
-          
-          # De link naar je AI (Publieke URL, zoals net getest!)
-          echo "AI_SERVICE_URL=https://keuzekompasai.clemens05.nl" >> .env
 
       # STAP 2: Stop oude container
       - name: Stop old container
-        run: docker rm -f backend-api || true
+        run: docker rm -f ai-service || true
 
-      # STAP 3: Bouw nieuwe image
+      # STAP 3: Bouw de image
       - name: Build Image
-        run: docker build -t backend-api .
+        run: docker build -t ai-service .
 
-      # STAP 4: Start container
-      # Let op: -p 8000:80 (zodat Nginx erbij kan)
-      # Let op: --env-file .env (zodat hij de settings hierboven pakt)
+      # STAP 4: Start de container
+      # Let op: ik heb '--env-file .env' toegevoegd zodat hij stap 1 gebruikt
       - name: Run Container
         run: |
           docker run -d \
-            --name backend-api \
+            --name ai-service \
             --network keuzekompas-net \
             --restart always \
             --env-file .env \
             -p 8000:80 \
-            backend-api
+            ai-service
 
-      # STAP 5: Opruimen
+      # STAP 5: Ruim oude troep op
       - name: Cleanup
         run: docker image prune -f
