@@ -26,10 +26,6 @@ jobs:
           echo "COLLECTION_NAME=modules" >> .env
           echo "JWT_ALGORITHM=HS256" >> .env
           
-          # --- SERVER SPECIFIEK ---
-          # Poort 5000 voor de interne container
-          echo "PORT=8000" >> .env
-          
           # De link naar je AI (Publieke URL, zoals net getest!)
           echo "AI_SERVICE_URL=https://keuzekompasai.clemens05.nl" >> .env
 
@@ -42,7 +38,7 @@ jobs:
         run: docker build -t backend-api .
 
       # STAP 4: Start container
-      # Let op: -p 8000:8000 (zodat Nginx erbij kan)
+      # Let op: -p 8000:80 (zodat Nginx erbij kan)
       # Let op: --env-file .env (zodat hij de settings hierboven pakt)
       - name: Run Container
         run: |
@@ -51,7 +47,7 @@ jobs:
             --network keuzekompas-net \
             --restart always \
             --env-file .env \
-            -p 8000:8000 \
+            -p 8000:80 \
             backend-api
 
       # STAP 5: Opruimen
