@@ -31,7 +31,7 @@ jobs:
             --name ai-service \
             --network keuzekompas-net \
             --restart always \
-            -p 127.0.0.1:8000:8000 \
+            -p 8000:8000 \
             ai-service
 
       # Stap 4: Ruim oude troep op
