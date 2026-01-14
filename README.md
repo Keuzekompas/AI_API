@@ -68,7 +68,10 @@ uvicorn app.main:app --reload
 
 De API is nu beschikbaar op: `http://127.0.0.1:8000`
 
-## Documentatie
+## Testen
 
-Na het opstarten is de automatische API-documentatie beschikbaar op:
-*   Swagger UI: `http://127.0.0.1:8000/docs`
+Voer de unit tests uit om de installatie te verifiëren:
+
+```bash
+python -m pytest
+```
