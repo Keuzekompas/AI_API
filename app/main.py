@@ -6,6 +6,8 @@ from slowapi.errors import RateLimitExceeded
 import nltk
 import os
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 
 from .schemas import RecommendationResponse, StudentInput, LanguageEnum
 from .services.state import state
@@ -16,6 +18,20 @@ from .train_model import train_and_save_model
 from .utils import sanitize_recursive
 
 load_dotenv()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- STARTUP LOGIC ---
+    print("Starting up: loading model and data...")
+    try:
+        load_data_and_model() 
+        print("Model and Data loaded successfully.")
+    except Exception as e:
+        print(f"Error during startup: {e}")
+    
+    yield
+    # --- SHUTDOWN LOGIC ---
+    print("Shutting down...")
 
 # NLTK Setup
 try:
@@ -28,7 +44,7 @@ except LookupError:
 # Rate-Limiting Setup
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler) # Rate limit handler
 
@@ -43,11 +59,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
-
-# Startup Event
-@app.on_event("startup")
-def startup_event():
-    load_data_and_model()
 
 # --- ENDPOINTS ---
 
