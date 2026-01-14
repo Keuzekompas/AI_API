@@ -1,4 +1,4 @@
-name: Deploy AI Service
+name: Deploy Backend API
 
 on:
   push:
@@ -12,28 +12,48 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Stap 1: Stop oude container
-      # "|| true" zorgt dat hij niet stopt met een error als dit de eerste keer is
+      # STAP 1: Maak .env bestand
+      # We combineren hier Secrets (veilig) met hardcoded settings (handig)
+      - name: Create .env file
+        run: |
+          # --- GEHEIMEN UIT GITHUB ---
+          echo "MONGO_URI=${{ secrets.MONGO_URI }}" > .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "CORS_POLICY=${{ secrets.CORS_POLICY }}" >> .env
+
+          # --- STANDAARD INSTELLINGEN ---
+          echo "DB_NAME=KeuzeKompas" >> .env
+          echo "COLLECTION_NAME=modules" >> .env
+          echo "JWT_ALGORITHM=HS256" >> .env
+          
+          # --- SERVER SPECIFIEK ---
+          # Poort 5000 voor de interne container
+          echo "PORT=8000" >> .env
+          
+          # De link naar je AI (Publieke URL, zoals net getest!)
+          echo "AI_SERVICE_URL=https://keuzekompasai.clemens05.nl" >> .env
+
+      # STAP 2: Stop oude container
       - name: Stop old container
-        run: docker rm -f ai-service || true
+        run: docker rm -f backend-api || true
 
-      # Stap 2: Bouw de image
-      # Dit kan even duren de eerste keer (HuggingFace model downloaden/copyen)
+      # STAP 3: Bouw nieuwe image
       - name: Build Image
-        run: docker build -t ai-service .
+        run: docker build -t backend-api .
 
-      # Stap 3: Start de container
-      # --name ai-service: Zodat de Backend hem kan vinden op http://ai-service:8000
-      # -p 127.0.0.1:8000:8000: Alleen lokaal bereikbaar voor Nginx
+      # STAP 4: Start container
+      # Let op: -p 8000:8000 (zodat Nginx erbij kan)
+      # Let op: --env-file .env (zodat hij de settings hierboven pakt)
       - name: Run Container
         run: |
           docker run -d \
-            --name ai-service \
+            --name backend-api \
             --network keuzekompas-net \
             --restart always \
-            -p 8000:80 \
-            ai-service
+            --env-file .env \
+            -p 8000:8000 \
+            backend-api
 
-      # Stap 4: Ruim oude troep op
+      # STAP 5: Opruimen
       - name: Cleanup
         run: docker image prune -f
