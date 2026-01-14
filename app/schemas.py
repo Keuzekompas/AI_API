@@ -16,8 +16,8 @@ class StudentInput(BaseModel):
     @field_validator('tags')
     @classmethod
     def validate_tags(cls, v):
-        if not (1 <= len(v) <= 3):
-            raise ValueError('You must provide between 1 and 3 tags')
+        if not (5 <= len(v) <= 15):
+            raise ValueError('You must provide between 5 and 15 tags')
         return v
     
     @field_validator('current_ects')
