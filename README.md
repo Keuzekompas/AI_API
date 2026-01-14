@@ -5,6 +5,7 @@ De AI-service voor het Keuzekompas project, verantwoordelijk voor het genereren 
 ## Vereisten
 
 *   **Python 3.11** of nieuwer
+*   **pip** (pakketbeheerder voor Python, meestal meegeleverd)
 *   **Git**
 *   **MongoDB** (Lokaal of cloud connection string)
 
