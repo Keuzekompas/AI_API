@@ -1,0 +1,39 @@
+name: Deploy AI Service
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Stap 1: Stop oude container
+      # "|| true" zorgt dat hij niet stopt met een error als dit de eerste keer is
+      - name: Stop old container
+        run: docker rm -f ai-service || true
+
+      # Stap 2: Bouw de image
+      # Dit kan even duren de eerste keer (HuggingFace model downloaden/copyen)
+      - name: Build Image
+        run: docker build -t ai-service .
+
+      # Stap 3: Start de container
+      # --name ai-service: Zodat de Backend hem kan vinden op http://ai-service:8000
+      # -p 127.0.0.1:8000:8000: Alleen lokaal bereikbaar voor Nginx
+      - name: Run Container
+        run: |
+          docker run -d \
+            --name ai-service \
+            --network keuzekompas-net \
+            --restart always \
+            -p 127.0.0.1:8000:8000 \
+            ai-service
+
+      # Stap 4: Ruim oude troep op
+      - name: Cleanup
+        run: docker image prune -f
