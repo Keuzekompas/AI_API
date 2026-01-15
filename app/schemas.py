@@ -11,7 +11,7 @@ class StudentInput(BaseModel):
     description: str = Field(..., min_length=10, max_length=1000)
     preferred_location: str | None = None
     current_ects: int = Field(...)
-    tags: list[str] = []
+    tags: list[str] = Field(...)
     
     @field_validator('tags')
     @classmethod
