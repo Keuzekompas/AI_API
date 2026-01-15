@@ -32,6 +32,14 @@ def verify_token(request: Request, bearer: Optional[HTTPAuthorizationCredentials
 
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        
+        # Security Check: Prevent usage of temporary 2FA tokens
+        if payload.get("isTemp") is True:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Full authentication required (2FA not completed)",
+            )
+            
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(

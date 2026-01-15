@@ -2,11 +2,13 @@ import pytest
 from fastapi.testclient import TestClient
 import pandas as pd
 import torch
+import jwt
 from unittest.mock import MagicMock, patch
 
 # Import app components
 from app.services.auth import verify_token
 from app.main import app
+from app.config import settings
 from app.services.state import state
 from app.utils import sanitize_text
 
@@ -66,6 +68,28 @@ def test_predict_study_success():
     assert data["recommendations"][0]["Module_Name"] == "Test Module NL"
 
     app.dependency_overrides = {}
+
+def test_predict_rejects_temp_token():
+    """Test that the API rejects a temporary 2FA token (isTemp: true)."""
+    # We DO NOT override dependencies here because we want to test the real verify_token logic
+    
+    # 1. Create a fake temp token
+    payload = {"userId": "user123", "isTemp": True}
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    
+    test_payload = {
+        "description": "Test",
+        "current_ects": 15
+    }
+
+    # 2. Use the token in a cookie (as per auth.py logic)
+    client.cookies.set("token", token)
+    
+    response = client.post("/api/predict", json=test_payload)
+    
+    # 3. Expect 403 Forbidden
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Full authentication required (2FA not completed)"
 
 def test_predict_study_no_results_for_ects():
     """Test if the API returns 422 on a unvalid ECT number."""
