@@ -1,83 +1,78 @@
-# AI API Service (FastAPI)
+# Keuzekompas AI API
 
-Dit is de AI-service voor het project. Deze applicatie is gebouwd met Python en **FastAPI**.
-De service draait los van de andere onderdelen en verwerkt AI-verzoeken.
+De AI-service voor het Keuzekompas project, verantwoordelijk voor het genereren van aanbevelingen en voorspellingen met behulp van machine learning.
 
-## 🚀 Aan de slag
+## Vereisten
 
-Volg deze stappen om het project lokaal op je machine te draaien.
+*   **Python 3.11** of nieuwer
+*   **pip** (pakketbeheerder voor Python, meestal meegeleverd)
+*   **Git**
+*   **MongoDB** (Lokaal of cloud connection string)
 
-### 1. Vereisten
+## Installatie
 
-Zorg dat je **Python** geïnstalleerd hebt (versie 3.8 of hoger).
-Controleer dit in je terminal:
+1.  **Clone de repository**
+    ```bash
+    git clone <REPOSITORY_URL>
+    cd AI_API
+    ```
+
+2.  **Maak een virtual environment aan**
+    *   Windows:
+        ```bash
+        python -m venv venv
+        venv\Scripts\activate
+        ```
+    *   macOS / Linux:
+        ```bash
+        python3 -m venv venv
+        source venv/bin/activate
+        ```
+
+3.  **Installeer afhankelijkheden**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Model downloaden**
+    Het modelbestand is te groot voor Git en moet apart gedownload worden.
+    *   Maak de map aan: `mkdir -p app/model`
+    *   Download `model.joblib` van [HuggingFace](https://huggingface.co/Q0xuzBEFIs/keuzekompas-model/resolve/main/model.joblib) en plaats deze in `app/model/`.
+    
+    *Structuur:* `app/model/model.joblib`
+
+## Configuratie
+
+Maak een bestand genaamd `.env` in de hoofdmap en voeg de volgende configuratie toe:
+
+```ini
+# Database
+MONGO_URI=mongodb://localhost:27017
+DB_NAME=keuzekompas
+COLLECTION_NAME=modules
+
+# Security
+JWT_SECRET=geheim_wachtwoord
+JWT_ALGORITHM=HS256
+
+# CORS
+CORS_POLICY=http://localhost:3000,http://127.0.0.1:3000
+```
+
+## Opstarten
+
+Start de applicatie met uvicorn:
 
 ```bash
-python --version
+uvicorn app.main:app --reload
 ```
 
-### 2. Virtual Environment aanmaken (Eénmalig)
+De API is nu beschikbaar op: `http://127.0.0.1:8000`
 
-Om conflicten met andere projecten te voorkomen, maken we een virtuele omgeving aan. Zorg dat je in de map `ai_api` staat in je terminal.
+## Testen
 
-**Windows:**
-```powershell
-python -m venv venv
-```
-
-**Mac/Linux:**
-```bash
-python3 -m venv venv
-```
-
-### 3. De omgeving activeren (Elke keer als je gaat werken)
-
-Voordat je commando's uitvoert, moet je zorgen dat je in de `(venv)` zit.
-
-**Windows (PowerShell):**
-```powershell
-.\venv\Scripts\activate
-```
-*(Als je een foutmelding krijgt over scripts, voer dan eerst `Set-ExecutionPolicy RemoteSigned -Scope Process` uit).*
-
-**Mac/Linux:**
-```bash
-source venv/bin/activate
-```
-
-✅ **Check:** Je zou nu `(venv)` voor je command line moeten zien staan.
-
-### 4. Dependencies installeren
-
-Installeer alle benodigde packages die in `requirements.txt` staan.
+Voer de unit tests uit om de installatie te verifiëren:
 
 ```bash
-pip install -r requirements.txt
-```
-
-### 5. De Server Starten
-
-Start de ontwikkelserver met hot-reload (zodat hij herstart als je code opslaat).
-
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-
-De API draait nu op: [http://localhost:8000](http://localhost:8000)
-
-## 📚 Documentatie (Swagger UI)
-
-FastAPI genereert automatische documentatie. Ga in je browser naar:
-
-👉 [http://localhost:8000/docs](http://localhost:8000/docs)
-
-Hier kun je alle endpoints bekijken en direct testen.
-
-## 🛠 Nieuwe package toevoegen?
-
-Als je een nieuwe library installeert (bijv. `pandas` of `torch`), vergeet dan niet de requirements file bij te werken zodat je teamgenoten deze ook krijgen:
-
-```bash
-pip install pakket-naam
-pip freeze > requirements.txt
+python -m pytest
 ```
