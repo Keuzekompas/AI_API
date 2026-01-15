@@ -54,7 +54,7 @@ def test_predict_study_success():
         "description": "I want to learn about AI and data science.",
         "preferred_location": "Breda",
         "current_ects": 15,
-        "tags": ["ai"]
+        "tags": ["ai", "data science", "machine learning", "python", "statistics"]
     }
 
     response = client.post("/api/predict?language=NL", json=test_payload)
@@ -68,18 +68,17 @@ def test_predict_study_success():
     app.dependency_overrides = {}
 
 def test_predict_study_no_results_for_ects():
-    """Test if the API returns an empty list when no modules match ECTS requirements."""
+    """Test if the API returns 422 on a unvalid ECT number."""
     app.dependency_overrides[verify_token] = lambda: {"sub": "test_user"}
 
     test_payload = {
         "description": "Random description",
-        "current_ects": 60,  # 60 > 30 (studycredit), so no results expected
+        "current_ects": 24,
     }
 
     response = client.post("/api/predict?language=NL", json=test_payload)
     
-    assert response.status_code == 200
-    assert response.json()["recommendations"] == []
+    assert response.status_code == 422
     
     app.dependency_overrides = {}
 
