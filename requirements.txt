@@ -16,7 +16,7 @@ datasets==4.4.2
 dill==0.4.0
 dnspython==2.8.0
 fastapi==0.128.0
-filelock==3.20.1
+filelock==3.20.3
 frozenlist==1.8.0
 fsspec==2025.9.0
 h11==0.16.0
