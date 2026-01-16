@@ -19,7 +19,27 @@ def _fetch_data_from_db():
         client = MongoClient(MONGO_URI)
         db = client[DB_NAME]
         collection = db[COLLECTION_NAME]
-        data = list(collection.find())
+
+        projection = {
+            "_id": 1,
+            
+            # Text fields for AI context
+            "name_en": 1, 
+            "name_nl": 1,
+            "description_en": 1, 
+            "description_nl": 1,
+            "module_tags_en": 1, 
+            "module_tags_nl": 1,
+
+            "shortdescription_en": 1, 
+            "shortdescription_nl": 1,
+
+            # Filters
+            "studycredit": 1, 
+            "location": 1
+        }
+
+        data = list(collection.find({}, projection))
         if not data:
             print("No data found in MongoDB.")
             return None
@@ -33,7 +53,7 @@ def _fetch_data_from_db():
 
 def _preprocess_data(data):
     df = pd.DataFrame(data)
-    print(f"✅ {len(df)} modules loaded from database.")
+    print(f"{len(df)} modules loaded from database.")
 
     required_cols = [
         'module_tags_en', 'module_tags_nl', 
@@ -62,7 +82,7 @@ def _preprocess_data(data):
 
 def _process_row(row):
     examples = []
-    # --- ENGELS ---
+    # --- ENGLISH ---
     tags_en = str(row['clean_tags_en'])
     desc_en = (str(row['shortdescription_en']) + " " + str(row['description_en'])).strip()
     title_en = str(row['name_en']).strip()
@@ -72,7 +92,7 @@ def _process_row(row):
     if len(title_en) > 2 and len(desc_en) > 10:
         examples.append(InputExample(texts=[title_en, desc_en]))
 
-    # --- NEDERLANDS ---
+    # --- DUTCH ---
     tags_nl = str(row['clean_tags_nl'])
     if len(tags_nl) < 2: 
         tags_nl = tags_en

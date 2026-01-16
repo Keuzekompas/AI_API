@@ -56,15 +56,15 @@ def _process_dataframe(df):
         if col not in df.columns:
             df[col] = None
 
-    # Vul lege waardes op
+    # Fill missing text fields with empty strings
     text_cols = ['description_en', 'shortdescription_en', 'learningoutcomes_en', 'name_en', 'description_nl', 'name_nl']
     df[text_cols] = df[text_cols].fillna('')
     
-    # Tags opschonen
+    # Tags cleaning
     df['clean_tags_en'] = df['module_tags_en'].apply(clean_tags_helper)
     df['clean_tags_nl'] = df['module_tags_nl'].apply(clean_tags_helper)
 
-    # AI Context genereren
+    # AI Context Generation
     if 'ai_context' not in df.columns:
         df['ai_context'] = (
             "Title (EN): " + df['name_en'] + ". " +
@@ -81,25 +81,46 @@ def _load_database_data():
         client = MongoClient(settings.MONGO_URI)
         db = client[settings.DB_NAME]
         collection = db[settings.COLLECTION_NAME]
+
+        projection = {
+            "_id": 1,
+            
+            # Text fields for AI context
+            "name_en": 1, 
+            "name_nl": 1,
+            "description_en": 1, 
+            "description_nl": 1,
+            "module_tags_en": 1, 
+            "module_tags_nl": 1,
+
+            "shortdescription_en": 1,
+            "shortdescription_nl": 1,
+            "learningoutcomes_en": 1,
+            "learningoutcomes_nl": 1,
+
+            # Filters
+            "studycredit": 1, 
+            "location": 1
+        }
         
-        data_from_mongo = list(collection.find())
+        data_from_mongo = list(collection.find({}, projection))
         
         if len(data_from_mongo) > 0:
             df = pd.DataFrame(data_from_mongo)
-            print(f"✅ Dataset loaded from MongoDB ({len(df)} records).")
+            print(f"Dataset loaded from MongoDB ({len(df)} records).")
             state.df = _process_dataframe(df)
             
             # Generate Embeddings
             if state.model:
                 print("Generating embeddings for database...")
                 state.module_embeddings = state.model.encode(state.df['ai_context'].tolist(), convert_to_tensor=True)
-                print("✅ Embeddings ready.")
+                print("Embeddings ready.")
         else:
-            print("⚠️ Warning: MongoDB collection is empty.")
+            print("Warning: MongoDB collection is empty.")
             state.df = None
 
     except Exception as e:
-        print(f"❌ Error connecting to MongoDB: {e}")
+        print(f"Error connecting to MongoDB: {e}")
         state.df = None
 
 def load_data_and_model():
