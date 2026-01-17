@@ -27,13 +27,14 @@ RUN python -m nltk.downloader punkt punkt_tab
 # 7. Kopieer de rest van je code
 COPY . .
 
-# 8. DOWNLOAD HET MODEL (Nieuwe stap!)
-# We maken eerst de map aan voor de zekerheid
-RUN mkdir -p app/model
+# 8. DOWNLOAD HET MODEL
+# We downloaden het model naar een map BUITEN de workdir (/app).
+# Dit voorkomt dat een volume mount (die vaak /app overschrijft) het model verbergt.
+RUN mkdir -p /model
+RUN wget https://huggingface.co/Q0xuzBEFIs/keuzekompas-model/resolve/main/model.joblib -O /model/model.joblib
 
-# Vervang onderstaande URL door jouw 'resolve' link van Hugging Face!
-# Let op de output vlag -O: die zorgt dat hij in de juiste map komt.
-RUN wget https://huggingface.co/Q0xuzBEFIs/keuzekompas-model/resolve/main/model.joblib -O app/model/model.joblib
+# Stel de variabele in zodat de app weet waar het model staat
+ENV MODEL_PATH=/model/model.joblib
 
 # 9. Open poort 80
 EXPOSE 80

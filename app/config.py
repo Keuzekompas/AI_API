@@ -10,7 +10,7 @@ class Settings:
     COLLECTION_NAME = os.getenv("COLLECTION_NAME")
     
     # Model
-    MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model', 'model.joblib')
+    MODEL_PATH = os.getenv("MODEL_PATH") or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model', 'model.joblib')
 
     # Algorithm Weights & Boosts
     LOCATION_BOOST = 0.15      # 15% bonus for location match
